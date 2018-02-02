@@ -21,7 +21,7 @@ The `scripts` demonstrate the usage of the framework.
 To symbolically execute an instruction trace of an obfuscated expressions, use
 
 ```
-python2 scripts/miasm_se_oracle.py samples/tigress_mba_trace.bin x86_64
+python2 scripts/symbolic_execution.py samples/tigress_mba_trace.bin x86_64
 
 ```
 
@@ -32,7 +32,7 @@ In this example, the expression is obfuscated via Mixed Boolean-Arithmetic (MBA)
 `random_sampling.py` generates random I/O pairs for a piece of code. Its output is a JSON file. To sample 20 times, use 
 
 ```
-python2 scripts/random_sampling samples/ tigress_mba_trace.bin x86_64 20 mba_sampling.json
+python2 scripts/random_sampling.py samples/tigress_mba_trace.bin x86_64 20 mba_sampling.json
 ```
 
 It can be specified if memory and/or register locations are inputs/outputs.
@@ -71,6 +71,75 @@ It can be specified if memory and/or register locations are inputs/outputs.
 ```
 
 The MBA-obfuscated expressions is equivalent to `(mem_0x2 * mem_0x0) + mem_0x4`, where `mem_i` corresponds to the i-th memory read.
+
+## Manual I/O Generation
+
+If random sampling does not work, I/O pairs can be crafted with other methods, e.g., by changing and observing values in a debugger. We define each input and output as follows:
+
+```
+{
+    "inputs": {
+        "0": {
+            "location": "mem0", 
+            "size": "0x4"
+        }, 
+        "1": {
+            "location": "mem1", 
+            "size": "0x4"
+        }
+    },
+    "outputs": {
+        "0": {
+            "location": "EAX", 
+            "size": "0x4"
+        }
+    }, 
+    "samples": [["0x2","0x6", "0xFFFFFFF9"],
+                ["0x14e","0x213","0xFFFFFc2d"],
+                ["0x3ed","0x2710","0xFFFFFBC8"]
+                ]
+}
+```
+
+
+Each list in `samples` defines the observed I/O pairs in one sampling step. Before synthesis, we use the script `transform_manual_sampling_inputs.py` to transform it into the same output form as the results of `random_sampling.py`.
+
+```
+python2 scripts/transform_manual_sampling_inputs.py manually_crafted.json sampling.json
+```
+
+The, we can synthesize it as usual and obtain
+
+```
+{
+    "0": {
+        "output": {
+            "name": "EAX", 
+            "number": 0, 
+            "size": 32
+        }, 
+        "top_non_terminal": {
+            "expression": {
+                "infix": "(~ ((u32 + u32) ^ (u32 & u32)))"
+            }, 
+            "reward": 1.0
+        }, 
+        "top_terminal": {
+            "expression": {
+                "infix": "(~ ((mem0 + mem0) ^ (mem0 & mem0)))"
+            }, 
+            "reward": 1.0
+        }, 
+        "successful": "yes", 
+        "result": {
+            "final_expression": {
+                "infix": "(~ ((mem0 + mem0) ^ (mem0 & mem0)))", 
+                "simplified": "~(2*mem0 ^ mem0)"
+            }
+        }
+    }
+}
+```
 
 ## General Program Synthesis
 
